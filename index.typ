@@ -51,12 +51,53 @@ When considering whether congress members, ignoring party affiliation, clustered
 
 #figure(
   image("plots/clustered_congress_members_comparison.png"),
-  caption: [Congress members clustered by their voting patterns via PCA, versus congress members colorized based on actual party affiliation]
+  caption: [Congress members clustered by their voting patterns via PCA, versus congress members colorized based on actual party affiliation. We used standard k-means clustering with Euclidean distance]
 ) <plot:clustered_congress_members_comparison>
 
 In @plot:clustered_congress_members_comparison the groups are indeed well visually separated and agree very well with party affiliation. There is some misclassification around where $"PCA-1"=0$ where the party affiliation plot is more fuzzy and there is more overlap in the region.
 
 - Assess the statistical significance of the clustering you found using permutation tests. For this purpose, define a score to measure the quality of the clustering (for example, this could be the objective function of the K-means algorithm). Compute that score on the clustering you found on the original dataset. Now, obtain a permuted dataset by permuting each congress member's votes randomly across different matters (this will make the votes random and independent of each other, but will preserve the distribution of Reject/Neutral/Accept for each individual member). Then cluster this permuted dataset using the same algorithm you used to cluster the original dataset. Compute the score of the clustering again. Repeat this randomization process a large number of times (as allowed by computation resources). Now compare the distribution of the clustering scores you obtained on the permuted instances to the score you obtained on the original dataset. Based on this comparison, can you conclude that the original dataset is significantly clustered? Explain why.
+
+#figure(
+```py
+kmeans = KMeans(n_clusters=2, random_state=22)
+kmeans.fit(congress_votes)
+original_score = kmeans.inertia_
+
+print(f"Original clustering score (inertia): {original_score}")
+
+# Now we shuffle, and repeat the clustering process a large number of times
+num_permutations = 100_000
+permuted_scores = np.zeros(num_permutations)
+
+for i in range(num_permutations):
+    # Shuffle the votes randomly across different matters
+    shuffled_votes = np.apply_along_axis(
+        np.random.permutation,
+        axis=1,
+        arr=congress_votes
+    )
+
+    # Cluster the permuted dataset using the same algorithm
+    kmeans_permuted = KMeans(n_clusters=2, random_state=22).fit(shuffled_votes)
+
+    # Compute the score of the clustering
+    permuted_scores[i] = kmeans_permuted.inertia_
+
+# Compute the mean score of the permuted datasets
+mean_permuted_score = permuted_scores.mean()
+
+# Compare the original score to the mean permuted score
+print(f"Mean permuted clustering score (inertia): {mean_permuted_score}")
+print(f"Absolute difference between original and mean permuted scores: {abs(original_score - mean_permuted_score)}")
+
+p_value = np.sum(permuted_scores < original_score) / num_permutations
+print(f"P-value: {p_value}")
+```,
+  caption: [Our algorithm for doing a permutation test for our K-means clusters, using the K-means objective function (via scipy's `.inertia_`]
+)
+
+Based on the results of our permutation test, we obtained a $p$-value of $p=0$ after permuting $100,000$ times, which is less than the significance level $alpha=0.05$. Therefore, we reject the null hypothesis that the observed clustering structure arose by chance alone. This provides strong evidence that the original dataset exhibits statistically significant clustering structure.
 
 == Part C
 
