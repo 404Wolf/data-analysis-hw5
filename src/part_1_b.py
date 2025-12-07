@@ -5,6 +5,8 @@ import matplotlib.pyplot as plt
 from part_1_a import congress_votes_pca
 import numpy as np
 
+NUM_PERMUTATIONS = 500
+
 # Use your favorite clustering algorithm to cluster the congress members into
 # two groups based on their congress votes on 16 issues. Make sure to explain
 # the clustering algorithm and the distance function that you use to cluster the
@@ -21,13 +23,14 @@ congress_party_affiliation = pd.read_csv(
 )
 
 # Perform KMeans clustering
-kmeans = KMeans(n_clusters=2, random_state=22)
-kmeans.fit(congress_votes)
+kmeans_for_all_issues = KMeans(n_clusters=2, random_state=22)
+kmeans_for_all_issues.fit(congress_votes)
 
 # Get cluster labels
-cluster_labels = kmeans.labels_
+cluster_labels = kmeans_for_all_issues.labels_
 
 # Get the first two principal components
+# For all individuals, their ([pca-1 and pca-1], ...).
 top_two_pca = congress_votes_pca[:, :2]
 
 # Create subplots side by side
@@ -89,15 +92,13 @@ plt.savefig('../plots/clustered_congress_members_comparison.png')
 # > Sum of squared distances of samples to their closest cluster center, weighted
 # > by the sample weights if provided.
 
-
-original_score = kmeans.inertia_
-print(f"Original clustering score (inertia): {original_score}")
+original_score_for_all_issues = kmeans_for_all_issues.inertia_
+print(f"Original clustering score (inertia): {original_score_for_all_issues}")
 
 # Now we shuffle, and repeat the clustering process a large number of times
-num_permutations = 500
-permuted_scores = np.zeros(num_permutations)
+permuted_scores = np.zeros(NUM_PERMUTATIONS)
 
-for i in range(num_permutations):
+for i in range(NUM_PERMUTATIONS):
     # Shuffle the votes randomly across different matters
     shuffled_votes = np.apply_along_axis(
         np.random.permutation,
@@ -116,9 +117,9 @@ mean_permuted_score = permuted_scores.mean()
 
 # Compare the original score to the mean permuted score
 print(f"Mean permuted clustering score (inertia): {mean_permuted_score}")
-print(f"Absolute difference between original and mean permuted scores: {abs(original_score - mean_permuted_score)}")
+print(f"Absolute difference between original and mean permuted scores: {abs(original_score_for_all_issues - mean_permuted_score)}")
 
-p_value = np.sum(permuted_scores < original_score) / num_permutations
+p_value = np.sum(permuted_scores < original_score_for_all_issues) / NUM_PERMUTATIONS
 print(f"P-value: {p_value}")
 print()
 
@@ -127,10 +128,43 @@ print()
 # affiliation).
 
 # Compute the mutual information between cluster membership and party affiliation
-cluster_labels = kmeans.labels_
+cluster_labels = kmeans_for_all_issues.labels_
 
 # Extract the party affiliation as a 1D array instead of DataFrame
 party_labels = congress_party_affiliation[0].values
 mutual_info = normalized_mutual_info_score(party_labels, cluster_labels)
 
 print(f"Mutual information between cluster membership and party affiliation: {mutual_info}")
+
+# Repeat the clustering analysis using the first two principal components (instead
+# of all 16 votes). Again, quantify the agreement of the clusters with the party
+# affiliations. Which clustering (using principal components vs. using all 16
+# votes) agrees with the party affiliations more? Comment on why this might be the
+# case.
+# Cluster the permuted dataset using the same algorithm but just for the first two principal components
+k_means_for_top_two_pca = KMeans(n_clusters=2, random_state=22).fit(top_two_pca)
+original_score_for_k_means_for_top_two_pca = k_means_for_top_two_pca.inertia_
+
+for i in range(NUM_PERMUTATIONS):
+    # Shuffle the votes randomly across different matters
+    shuffled_votes = np.apply_along_axis(
+        np.random.permutation,
+        axis=1,
+        arr=top_two_pca
+    )
+
+    # Cluster the permuted dataset using the same algorithm
+    kmeans_permuted = KMeans(n_clusters=2, random_state=22).fit(shuffled_votes)
+
+    # Compute the score of the clustering
+    permuted_scores[i] = kmeans_permuted.inertia_
+
+# Compute p-value for top two PCA clustering
+p_value_top_two_pca = np.sum(permuted_scores < original_score_for_k_means_for_top_two_pca) / NUM_PERMUTATIONS
+print(f"P-value (using top two PCA): {p_value_top_two_pca}")
+
+# Compute the mutual information between cluster membership and party affiliation for the first two principal components
+cluster_labels = k_means_for_top_two_pca.labels_
+mutual_info_top_two_pca = normalized_mutual_info_score(party_labels, cluster_labels)
+
+print(f"Mutual information between cluster membership and party affiliation (using top two PCA): {mutual_info_top_two_pca}")

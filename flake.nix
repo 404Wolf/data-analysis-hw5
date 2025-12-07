@@ -37,7 +37,7 @@
           programs = {
             nixfmt.enable = true;
             yamlfmt.enable = true;
-            typstfmt.enable = true;
+            typstyle.enable = true;
           };
         };
       in
